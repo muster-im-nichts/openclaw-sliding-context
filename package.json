@@ -1,0 +1,32 @@
+{
+  "name": "@muster-im-nichts/openclaw-sliding-context",
+  "version": "0.1.0",
+  "description": "Sliding context window plugin for OpenClaw — cross-session working memory",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": ["openclaw", "plugin", "memory", "context", "sliding-window"],
+  "author": "muster-im-nichts",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/muster-im-nichts/openclaw-sliding-context"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.1.0"
+  },
+  "dependencies": {
+    "@lancedb/lancedb": "^0.15.0",
+    "@sinclair/typebox": "^0.34.0",
+    "openai": "^4.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "id": "sliding-context",
+  "name": "Sliding Context",
+  "description": "Cross-session working memory with sliding context window. Automatically captures turn summaries and injects relevant recent context into every agent turn.",
+  "version": "0.1.0",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "embedding": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "apiKey": { "type": "string" },
+          "model": {
+            "type": "string",
+            "enum": ["text-embedding-3-small", "text-embedding-3-large"],
+            "default": "text-embedding-3-small"
+          }
+        },
+        "required": ["apiKey"]
+      },
+      "dbPath": { "type": "string" },
+      "windowHours": {
+        "type": "number",
+        "minimum": 1,
+        "maximum": 168,
+        "default": 48
+      },
+      "recentCount": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 20,
+        "default": 5
+      },
+      "relevantCount": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 10,
+        "default": 3
+      },
+      "maxInjectEntries": {
+        "type": "number",
+        "minimum": 1,
+        "maximum": 20,
+        "default": 8
+      },
+      "maxInjectTokens": {
+        "type": "number",
+        "minimum": 200,
+        "maximum": 5000,
+        "default": 1500
+      },
+      "summaryMaxChars": {
+        "type": "number",
+        "minimum": 50,
+        "maximum": 500,
+        "default": 200
+      },
+      "skipTrivial": {
+        "type": "boolean",
+        "default": true
+      },
+      "skipSessions": {
+        "type": "array",
+        "items": { "type": "string" },
+        "default": []
+      }
+    },
+    "required": ["embedding"]
+  },
+  "uiHints": {
+    "embedding.apiKey": {
+      "label": "OpenAI API Key",
+      "sensitive": true,
+      "placeholder": "sk-proj-...",
+      "help": "API key for OpenAI embeddings (or use ${OPENAI_API_KEY})"
+    },
+    "windowHours": {
+      "label": "Context Window (hours)",
+      "help": "How far back to look for context (default: 48h)"
+    },
+    "maxInjectTokens": {
+      "label": "Max Inject Tokens",
+      "help": "Hard limit on injected context size per turn",
+      "advanced": true
+    },
+    "skipSessions": {
+      "label": "Skip Sessions",
+      "help": "Session keys to never capture (e.g. group chats with strangers)",
+      "advanced": true
+    }
+  }
+}
