@@ -27,22 +27,30 @@ function truncate(text: string, maxLen: number): string {
 }
 
 /**
- * Build a compact transcript from messages for the LLM to summarize.
+ * Build a compact transcript from the MOST RECENT messages for the LLM to summarize.
+ * Reads from the end of the conversation backwards to capture the latest turn.
  * Strips tool call details and keeps it focused.
  */
 function buildTranscript(messages: unknown[], maxChars: number): string {
   const lines: string[] = [];
   let charCount = 0;
 
-  for (const msg of messages as MessageLike[]) {
+  // Walk backwards from the most recent messages
+  const msgs = (messages as MessageLike[]).slice().reverse();
+
+  for (const msg of msgs) {
     const role = msg.role as string;
     if (!role) continue;
+
+    // Skip system messages
+    if (role === "system") continue;
 
     // For tool results, just note the tool name
     if (role === "tool") {
       const name = msg.name ?? "tool";
       const line = `[Tool result: ${name}]`;
-      lines.push(line);
+      if (charCount + line.length > maxChars) break;
+      lines.unshift(line); // prepend to keep chronological order
       charCount += line.length;
       continue;
     }
@@ -55,7 +63,8 @@ function buildTranscript(messages: unknown[], maxChars: number): string {
           return fn?.name ?? "unknown";
         });
       const line = `[Assistant called: ${calls.join(", ")}]`;
-      lines.push(line);
+      if (charCount + line.length > maxChars) break;
+      lines.unshift(line);
       charCount += line.length;
       continue;
     }
@@ -66,10 +75,9 @@ function buildTranscript(messages: unknown[], maxChars: number): string {
     const prefix = role === "user" ? "User" : "Assistant";
     const truncated = truncate(text, Math.min(300, maxChars - charCount));
     const line = `${prefix}: ${truncated}`;
-    lines.push(line);
+    if (charCount + line.length > maxChars) break;
+    lines.unshift(line);
     charCount += line.length;
-
-    if (charCount >= maxChars) break;
   }
 
   return lines.join("\n");
