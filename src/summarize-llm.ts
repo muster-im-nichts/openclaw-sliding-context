@@ -27,35 +27,42 @@ function truncate(text: string, maxLen: number): string {
 }
 
 /**
- * Build a compact transcript from the MOST RECENT messages for the LLM to summarize.
- * Reads from the end of the conversation backwards to capture the latest turn.
- * Strips tool call details and keeps it focused.
+ * Extract only the LAST interaction (user message → assistant response) from the session.
+ * This avoids summarizing the entire session repeatedly — each turn captures only
+ * what's new, building a granular history entry by entry.
  */
 function buildTranscript(messages: unknown[], maxChars: number): string {
+  const msgs = messages as MessageLike[];
   const lines: string[] = [];
+
+  // Find the last user message (the trigger for this turn)
+  let lastUserIdx = -1;
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    if ((msgs[i]).role === "user") {
+      lastUserIdx = i;
+      break;
+    }
+  }
+
+  if (lastUserIdx === -1) return "";
+
+  // Collect from last user message to end (= this turn only)
+  const turnMessages = msgs.slice(lastUserIdx);
   let charCount = 0;
 
-  // Walk backwards from the most recent messages
-  const msgs = (messages as MessageLike[]).slice().reverse();
-
-  for (const msg of msgs) {
+  for (const msg of turnMessages) {
     const role = msg.role as string;
-    if (!role) continue;
+    if (!role || role === "system") continue;
 
-    // Skip system messages
-    if (role === "system") continue;
-
-    // For tool results, just note the tool name
     if (role === "tool") {
       const name = msg.name ?? "tool";
       const line = `[Tool result: ${name}]`;
       if (charCount + line.length > maxChars) break;
-      lines.unshift(line); // prepend to keep chronological order
+      lines.push(line);
       charCount += line.length;
       continue;
     }
 
-    // For assistant tool calls, list what was called
     if (role === "assistant" && Array.isArray(msg.tool_calls)) {
       const calls = (msg.tool_calls as Record<string, unknown>[])
         .map((tc) => {
@@ -64,7 +71,7 @@ function buildTranscript(messages: unknown[], maxChars: number): string {
         });
       const line = `[Assistant called: ${calls.join(", ")}]`;
       if (charCount + line.length > maxChars) break;
-      lines.unshift(line);
+      lines.push(line);
       charCount += line.length;
       continue;
     }
@@ -73,10 +80,10 @@ function buildTranscript(messages: unknown[], maxChars: number): string {
     if (!text) continue;
 
     const prefix = role === "user" ? "User" : "Assistant";
-    const truncated = truncate(text, Math.min(300, maxChars - charCount));
+    const truncated = truncate(text, Math.min(400, maxChars - charCount));
     const line = `${prefix}: ${truncated}`;
     if (charCount + line.length > maxChars) break;
-    lines.unshift(line);
+    lines.push(line);
     charCount += line.length;
   }
 
