@@ -1,5 +1,5 @@
 {
-  "name": "@muster-im-nichts/openclaw-sliding-context",
+  "name": "@muster-im-nichts/sliding-context",
   "version": "0.1.0",
   "description": "Sliding context window plugin for OpenClaw — cross-session working memory",
   "type": "module",
