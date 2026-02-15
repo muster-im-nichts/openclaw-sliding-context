@@ -20,7 +20,29 @@
         },
         "required": ["apiKey"]
       },
+      "summarization": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": ["llm", "rule-based"],
+            "default": "llm"
+          },
+          "apiKey": { "type": "string" },
+          "model": {
+            "type": "string",
+            "default": "claude-sonnet-4-20250514"
+          }
+        }
+      },
       "dbPath": { "type": "string" },
+      "decayHalfLifeHours": {
+        "type": "number",
+        "minimum": 1,
+        "maximum": 72,
+        "default": 18
+      },
       "windowHours": {
         "type": "number",
         "minimum": 1,
@@ -76,9 +98,23 @@
       "placeholder": "sk-proj-...",
       "help": "API key for OpenAI embeddings (or use ${OPENAI_API_KEY})"
     },
+    "summarization.mode": {
+      "label": "Summarization Mode",
+      "help": "llm (Claude Sonnet, more accurate) or rule-based (free, faster)"
+    },
+    "summarization.apiKey": {
+      "label": "Anthropic API Key (for LLM summaries)",
+      "sensitive": true,
+      "placeholder": "sk-ant-...",
+      "help": "Falls back to embedding API key if not set"
+    },
     "windowHours": {
       "label": "Context Window (hours)",
       "help": "How far back to look for context (default: 48h)"
+    },
+    "decayHalfLifeHours": {
+      "label": "Decay Half-Life (hours)",
+      "help": "After this many hours, recency weight drops to 50% (default: 18h)"
     },
     "maxInjectTokens": {
       "label": "Max Inject Tokens",

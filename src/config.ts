@@ -7,8 +7,14 @@ export type SlidingContextConfig = {
     apiKey: string;
     model: string;
   };
+  summarization: {
+    mode: "rule-based" | "llm";
+    apiKey?: string;
+    model: string;
+  };
   dbPath: string;
   windowHours: number;
+  decayHalfLifeHours: number;
   recentCount: number;
   relevantCount: number;
   maxInjectEntries: number;
@@ -20,8 +26,10 @@ export type SlidingContextConfig = {
 
 const DEFAULTS = {
   model: "text-embedding-3-small",
+  summarizationModel: "claude-sonnet-4-20250514",
   dbPath: "~/.openclaw/sliding-context/lancedb",
   windowHours: 48,
+  decayHalfLifeHours: 18,
   recentCount: 5,
   relevantCount: 3,
   maxInjectEntries: 8,
@@ -70,13 +78,29 @@ export function parseConfig(raw: unknown): SlidingContextConfig {
   const model = typeof embedding.model === "string" ? embedding.model : DEFAULTS.model;
   vectorDimsForModel(model); // validate
 
+  // Summarization config
+  const summarization = cfg.summarization as Record<string, unknown> | undefined;
+  const sumMode = summarization?.mode === "rule-based" ? "rule-based" : "llm"; // default: llm
+  const sumApiKey = typeof summarization?.apiKey === "string"
+    ? resolveEnvVars(summarization.apiKey)
+    : undefined;
+  const sumModel = typeof summarization?.model === "string"
+    ? summarization.model
+    : DEFAULTS.summarizationModel;
+
   return {
     embedding: {
       apiKey: resolveEnvVars(embedding.apiKey),
       model,
     },
+    summarization: {
+      mode: sumMode,
+      apiKey: sumApiKey,
+      model: sumModel,
+    },
     dbPath: typeof cfg.dbPath === "string" ? cfg.dbPath : DEFAULTS.dbPath,
     windowHours: num(cfg.windowHours, DEFAULTS.windowHours),
+    decayHalfLifeHours: num(cfg.decayHalfLifeHours, DEFAULTS.decayHalfLifeHours),
     recentCount: num(cfg.recentCount, DEFAULTS.recentCount),
     relevantCount: num(cfg.relevantCount, DEFAULTS.relevantCount),
     maxInjectEntries: num(cfg.maxInjectEntries, DEFAULTS.maxInjectEntries),

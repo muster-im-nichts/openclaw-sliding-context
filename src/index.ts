@@ -23,6 +23,7 @@ import {
   extractTopics,
   detectSessionType,
 } from "./summarize.js";
+import { summarizeWithLlm } from "./summarize-llm.js";
 import { deduplicateAndRank } from "./ranking.js";
 import { formatSlidingContext } from "./format.js";
 
@@ -56,8 +57,18 @@ const slidingContextPlugin = {
       if (cfg.skipSessions.includes(sessionKey)) return;
 
       try {
-        // Extract summary
-        const summary = extractTurnSummary(messages, cfg.summaryMaxChars);
+        // Extract summary (LLM or rule-based)
+        let summary: string;
+        if (cfg.summarization.mode === "llm") {
+          const llmApiKey = cfg.summarization.apiKey ?? cfg.embedding.apiKey;
+          summary = await summarizeWithLlm(messages, {
+            apiKey: llmApiKey,
+            model: cfg.summarization.model,
+            maxChars: cfg.summaryMaxChars,
+          }, api.logger);
+        } else {
+          summary = extractTurnSummary(messages, cfg.summaryMaxChars);
+        }
         if (!summary || summary.length < 10) return;
 
         // Embed
@@ -109,6 +120,7 @@ const slidingContextPlugin = {
           currentSession: sessionKey,
           now: Date.now(),
           maxEntries: cfg.maxInjectEntries,
+          decayHalfLifeHours: cfg.decayHalfLifeHours,
         });
 
         if (merged.length === 0) return;

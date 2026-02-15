@@ -11,6 +11,7 @@ export type RankingParams = {
   currentSession: string;
   now: number;
   maxEntries: number;
+  decayHalfLifeHours: number;
 };
 
 /**
@@ -33,9 +34,11 @@ export function computeScore(
   // Semantic relevance (0 - 0.4)
   score += Math.min(semanticScore, 1) * 0.4;
 
-  // Recency (0 - 0.3) — exponential decay
+  // Recency (0 - 0.3) — exponential decay with configurable half-life
   const hoursAgo = (params.now - entry.timestamp) / 3_600_000;
-  score += Math.exp(-hoursAgo / 12) * 0.3; // half-life ≈ 8h
+  // Formula: exp(-hoursAgo * ln(2) / halfLife) gives exact 50% at halfLife
+  const lambda = Math.LN2 / params.decayHalfLifeHours;
+  score += Math.exp(-lambda * hoursAgo) * 0.3;
 
   // Same session boost (0 - 0.1)
   if (entry.sessionKey === params.currentSession) {
