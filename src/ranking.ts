@@ -94,3 +94,36 @@ export function deduplicateAndRank(
   scored.sort((a, b) => b.finalScore - a.finalScore);
   return scored.slice(0, params.maxEntries);
 }
+
+/**
+ * Split entries into chronological (recent window, time-ordered) and
+ * ranked (older, score-ordered) groups.
+ *
+ * Chronological entries are sorted oldest→newest (ASC) to form a timeline.
+ * Ranked entries are sorted by finalScore descending.
+ */
+export function splitChronologicalAndRanked(
+  entries: ScoredEntry[],
+  recentWindowHours: number,
+  now: number,
+): { chronological: ScoredEntry[]; ranked: ScoredEntry[] } {
+  const cutoff = now - recentWindowHours * 3_600_000;
+
+  const chronological: ScoredEntry[] = [];
+  const ranked: ScoredEntry[] = [];
+
+  for (const entry of entries) {
+    if (entry.timestamp >= cutoff) {
+      chronological.push(entry);
+    } else {
+      ranked.push(entry);
+    }
+  }
+
+  // Chronological: oldest first (timeline order)
+  chronological.sort((a, b) => a.timestamp - b.timestamp);
+  // Ranked: best score first
+  ranked.sort((a, b) => b.finalScore - a.finalScore);
+
+  return { chronological, ranked };
+}

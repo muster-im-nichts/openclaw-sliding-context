@@ -24,8 +24,9 @@ import {
   detectSessionType,
 } from "./summarize.js";
 import { summarizeWithLlm } from "./summarize-llm.js";
-import { deduplicateAndRank } from "./ranking.js";
+import { deduplicateAndRank, splitChronologicalAndRanked } from "./ranking.js";
 import { formatSlidingContext } from "./format.js";
+import { generateTimeline } from "./timeline.js";
 
 const slidingContextPlugin = {
   id: "sliding-context",
@@ -107,9 +108,12 @@ const slidingContextPlugin = {
       const sessionKey = (event as Record<string, unknown>).sessionKey as string | undefined ?? "unknown";
 
       try {
-        // Two-pass retrieval
+        // Three-pass retrieval
+        const now = Date.now();
+
+        // Pass 1 + 2 in parallel: recent entries + embed prompt for semantic search
         const [recent, vector] = await Promise.all([
-          store.getRecent(cfg.recentCount, cfg.windowHours),
+          store.getRecent(cfg.recentCount + cfg.relevantCount, cfg.windowHours),
           embeddings.embed(prompt),
         ]);
 
@@ -118,24 +122,47 @@ const slidingContextPlugin = {
         // Merge, rank, deduplicate
         const merged = deduplicateAndRank(recent, relevant, {
           currentSession: sessionKey,
-          now: Date.now(),
+          now,
           maxEntries: cfg.maxInjectEntries,
           decayHalfLifeHours: cfg.decayHalfLifeHours,
         });
 
         if (merged.length === 0) return;
 
+        // Split into chronological (recent window) and ranked (older)
+        const { chronological, ranked } = splitChronologicalAndRanked(
+          merged,
+          cfg.recentWindowHours,
+          now,
+        );
+
         // Format for injection
-        const context = formatSlidingContext(merged, {
+        const context = formatSlidingContext(chronological, ranked, {
           maxTokens: cfg.maxInjectTokens,
           windowHours: cfg.windowHours,
         });
 
         if (!context) return;
 
-        api.logger.info?.(`sliding-context: injecting ${merged.length} entries into ${sessionKey}`);
+        // Pass 3: Timeline block (filesystem only, no API calls)
+        let fullContext = context;
+        if (cfg.timeline.enabled) {
+          try {
+            const workspacePath = (api as Record<string, unknown>).workspace as string | undefined
+              ?? cfg.timeline.workspacePath;
+            const timeline = await generateTimeline(workspacePath);
+            if (timeline) {
+              fullContext = context + "\n" + timeline;
+            }
+          } catch {
+            // Timeline is optional — failures are silent
+          }
+        }
 
-        return { prependContext: context };
+        const totalEntries = chronological.length + ranked.length;
+        api.logger.info?.(`sliding-context: injecting ${totalEntries} entries (${chronological.length} chrono + ${ranked.length} ranked) into ${sessionKey}`);
+
+        return { prependContext: fullContext };
       } catch (err) {
         api.logger.warn(`sliding-context: recall failed: ${String(err)}`);
       }
@@ -188,7 +215,7 @@ const slidingContextPlugin = {
           return {
             content: [{
               type: "text",
-              text: `Sliding Context: ${count} entries, ${cfg.windowHours}h window, ${cfg.recentCount} recent + ${cfg.relevantCount} relevant per turn`,
+              text: `Sliding Context: ${count} entries, ${cfg.windowHours}h window (${cfg.recentWindowHours}h chronological), ${cfg.recentCount} recent + ${cfg.relevantCount} relevant per turn, timeline: ${cfg.timeline.enabled ? "on" : "off"}`,
             }],
           };
         },
@@ -212,8 +239,10 @@ const slidingContextPlugin = {
           .action(async () => {
             const count = await store.count();
             console.log(`Entries: ${count}`);
-            console.log(`Window: ${cfg.windowHours}h`);
-            console.log(`Inject: ${cfg.recentCount} recent + ${cfg.relevantCount} relevant (max ${cfg.maxInjectEntries})`);
+            console.log(`Window: ${cfg.windowHours}h (recent: ${cfg.recentWindowHours}h chronological)`);
+            console.log(`Inject: ${cfg.recentCount} recent + ${cfg.relevantCount} relevant (max ${cfg.maxInjectEntries}, max ${cfg.maxInjectTokens} tokens)`);
+            console.log(`Summary: max ${cfg.summaryMaxChars} chars`);
+            console.log(`Timeline: ${cfg.timeline.enabled ? "enabled" : "disabled"}`);
             console.log(`DB: ${resolvedDbPath}`);
           });
 

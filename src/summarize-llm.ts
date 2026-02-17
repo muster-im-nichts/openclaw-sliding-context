@@ -105,7 +105,7 @@ export async function summarizeWithLlm(
   config: LlmSummarizeConfig,
   logger?: { warn: (msg: string) => void },
 ): Promise<string> {
-  const transcript = buildTranscript(messages, 1500);
+  const transcript = buildTranscript(messages, 2500);
   if (!transcript || transcript.length < 20) {
     return extractTurnSummary(messages, config.maxChars);
   }
@@ -120,11 +120,16 @@ export async function summarizeWithLlm(
       },
       body: JSON.stringify({
         model: config.model,
-        max_tokens: 150,
+        max_tokens: 250,
         messages: [
           {
             role: "user",
-            content: `Summarize this agent conversation turn in 1-2 sentences. Focus on: what was requested, what was done, and the outcome. Be concise and factual. Use the same language as the conversation (German if German, English if English).
+            content: `Summarize this agent conversation turn in 1-3 sentences. Focus on:
+1. What was the user's request or question?
+2. What concrete actions were taken? (files changed, commands run, decisions made)
+3. What was the outcome or result?
+
+Be specific about filenames, numbers, and decisions. Use the same language as the conversation (German if German, English if English).
 
 <transcript>
 ${transcript}

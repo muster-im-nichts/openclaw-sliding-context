@@ -92,8 +92,10 @@ export class ContextStore {
     const cutoff = Date.now() - windowHours * 3600_000;
 
     // LanceDB doesn't have great filter support, so we fetch more and filter in JS
+    // With 7-day windows we need a higher overfetch factor
+    const overfetch = Math.max(limit * 5, 100);
     const rows = await this.table!.query()
-      .limit(limit * 3) // overfetch
+      .limit(overfetch)
       .toArray();
 
     return rows

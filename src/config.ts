@@ -14,6 +14,7 @@ export type SlidingContextConfig = {
   };
   dbPath: string;
   windowHours: number;
+  recentWindowHours: number;
   decayHalfLifeHours: number;
   recentCount: number;
   relevantCount: number;
@@ -22,21 +23,28 @@ export type SlidingContextConfig = {
   summaryMaxChars: number;
   skipTrivial: boolean;
   skipSessions: string[];
+  timeline: {
+    enabled: boolean;
+    workspacePath: string;
+  };
 };
 
 const DEFAULTS = {
   model: "text-embedding-3-small",
   summarizationModel: "claude-sonnet-4-20250514",
   dbPath: "~/.openclaw/sliding-context/lancedb",
-  windowHours: 48,
+  windowHours: 168,
+  recentWindowHours: 12,
   decayHalfLifeHours: 18,
-  recentCount: 5,
-  relevantCount: 3,
-  maxInjectEntries: 8,
-  maxInjectTokens: 1500,
-  summaryMaxChars: 200,
+  recentCount: 8,
+  relevantCount: 5,
+  maxInjectEntries: 12,
+  maxInjectTokens: 2500,
+  summaryMaxChars: 500,
   skipTrivial: true,
   skipSessions: [] as string[],
+  timelineEnabled: true,
+  timelineWorkspacePath: "/root/.openclaw/workspace",
 } as const;
 
 const EMBEDDING_DIMENSIONS: Record<string, number> = {
@@ -88,6 +96,9 @@ export function parseConfig(raw: unknown): SlidingContextConfig {
     ? summarization.model
     : DEFAULTS.summarizationModel;
 
+  // Timeline config
+  const timelineCfg = cfg.timeline as Record<string, unknown> | undefined;
+
   return {
     embedding: {
       apiKey: resolveEnvVars(embedding.apiKey),
@@ -100,6 +111,7 @@ export function parseConfig(raw: unknown): SlidingContextConfig {
     },
     dbPath: typeof cfg.dbPath === "string" ? cfg.dbPath : DEFAULTS.dbPath,
     windowHours: num(cfg.windowHours, DEFAULTS.windowHours),
+    recentWindowHours: num(cfg.recentWindowHours, DEFAULTS.recentWindowHours),
     decayHalfLifeHours: num(cfg.decayHalfLifeHours, DEFAULTS.decayHalfLifeHours),
     recentCount: num(cfg.recentCount, DEFAULTS.recentCount),
     relevantCount: num(cfg.relevantCount, DEFAULTS.relevantCount),
@@ -108,6 +120,10 @@ export function parseConfig(raw: unknown): SlidingContextConfig {
     summaryMaxChars: num(cfg.summaryMaxChars, DEFAULTS.summaryMaxChars),
     skipTrivial: typeof cfg.skipTrivial === "boolean" ? cfg.skipTrivial : DEFAULTS.skipTrivial,
     skipSessions: Array.isArray(cfg.skipSessions) ? cfg.skipSessions.filter((s): s is string => typeof s === "string") : DEFAULTS.skipSessions,
+    timeline: {
+      enabled: typeof timelineCfg?.enabled === "boolean" ? timelineCfg.enabled : DEFAULTS.timelineEnabled,
+      workspacePath: typeof timelineCfg?.workspacePath === "string" ? timelineCfg.workspacePath : DEFAULTS.timelineWorkspacePath,
+    },
   };
 }
 
