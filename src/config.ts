@@ -2,7 +2,10 @@
  * Configuration parsing and defaults for the sliding context plugin.
  */
 
+import type { Locale } from "./i18n.js";
+
 export type SlidingContextConfig = {
+  locale: Locale;
   embedding: {
     apiKey: string;
     model: string;
@@ -99,7 +102,11 @@ export function parseConfig(raw: unknown): SlidingContextConfig {
   // Timeline config
   const timelineCfg = cfg.timeline as Record<string, unknown> | undefined;
 
+  // Locale
+  const locale: Locale = cfg.locale === "en" ? "en" : "de";
+
   return {
+    locale,
     embedding: {
       apiKey: resolveEnvVars(embedding.apiKey),
       model,

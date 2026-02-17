@@ -5,6 +5,8 @@
  */
 
 import { extractTurnSummary } from "./summarize.js";
+import type { Locale } from "./i18n.js";
+import { t } from "./i18n.js";
 
 type MessageLike = Record<string, unknown>;
 
@@ -94,6 +96,7 @@ export type LlmSummarizeConfig = {
   apiKey: string;
   model: string;
   maxChars: number;
+  locale: Locale;
 };
 
 /**
@@ -124,12 +127,7 @@ export async function summarizeWithLlm(
         messages: [
           {
             role: "user",
-            content: `Summarize this agent conversation turn in 1-3 sentences. Focus on:
-1. What was the user's request or question?
-2. What concrete actions were taken? (files changed, commands run, decisions made)
-3. What was the outcome or result?
-
-Be specific about filenames, numbers, and decisions. Use the same language as the conversation (German if German, English if English).
+            content: `${t(config.locale).summarizationPrompt}
 
 <transcript>
 ${transcript}

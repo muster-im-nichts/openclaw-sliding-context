@@ -27,6 +27,7 @@ import { summarizeWithLlm } from "./summarize-llm.js";
 import { deduplicateAndRank, splitChronologicalAndRanked } from "./ranking.js";
 import { formatSlidingContext } from "./format.js";
 import { generateTimeline } from "./timeline.js";
+import { t } from "./i18n.js";
 
 const slidingContextPlugin = {
   id: "sliding-context",
@@ -66,6 +67,7 @@ const slidingContextPlugin = {
             apiKey: llmApiKey,
             model: cfg.summarization.model,
             maxChars: cfg.summaryMaxChars,
+            locale: cfg.locale,
           }, api.logger);
         } else {
           summary = extractTurnSummary(messages, cfg.summaryMaxChars);
@@ -140,6 +142,7 @@ const slidingContextPlugin = {
         const context = formatSlidingContext(chronological, ranked, {
           maxTokens: cfg.maxInjectTokens,
           windowHours: cfg.windowHours,
+          locale: cfg.locale,
         });
 
         if (!context) return;
@@ -150,7 +153,7 @@ const slidingContextPlugin = {
           try {
             const workspacePath = (api as Record<string, unknown>).workspace as string | undefined
               ?? cfg.timeline.workspacePath;
-            const timeline = await generateTimeline(workspacePath);
+            const timeline = await generateTimeline(workspacePath, cfg.locale);
             if (timeline) {
               fullContext = context + "\n" + timeline;
             }
@@ -237,12 +240,14 @@ const slidingContextPlugin = {
         sc.command("stats")
           .description("Show context statistics")
           .action(async () => {
+            const s = t(cfg.locale);
             const count = await store.count();
-            console.log(`Entries: ${count}`);
-            console.log(`Window: ${cfg.windowHours}h (recent: ${cfg.recentWindowHours}h chronological)`);
+            console.log(`${s.statsEntries}: ${count}`);
+            console.log(`${s.statsWindow}: ${cfg.windowHours}h (recent: ${cfg.recentWindowHours}h chronological)`);
             console.log(`Inject: ${cfg.recentCount} recent + ${cfg.relevantCount} relevant (max ${cfg.maxInjectEntries}, max ${cfg.maxInjectTokens} tokens)`);
             console.log(`Summary: max ${cfg.summaryMaxChars} chars`);
-            console.log(`Timeline: ${cfg.timeline.enabled ? "enabled" : "disabled"}`);
+            console.log(`${s.statsTimeline}: ${cfg.timeline.enabled ? "enabled" : "disabled"}`);
+            console.log(`Locale: ${cfg.locale}`);
             console.log(`DB: ${resolvedDbPath}`);
           });
 

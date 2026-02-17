@@ -8,22 +8,20 @@
 
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
+import type { Locale } from "./i18n.js";
+import { t } from "./i18n.js";
 
-function formatDate(date: Date): string {
-  const months = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-  ];
-  return `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+function formatDate(date: Date, locale: Locale): string {
+  const s = t(locale);
+  return `${date.getDate()}. ${s.months[date.getMonth()]} ${date.getFullYear()}`;
 }
 
 function daysAgo(date: Date, now: Date): number {
   return Math.floor((now.getTime() - date.getTime()) / 86_400_000);
 }
 
-function dayOfWeek(date: Date): string {
-  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-  return days[date.getDay()];
+function dayOfWeek(date: Date, locale: Locale): string {
+  return t(locale).days[date.getDay()];
 }
 
 async function readFileSafe(path: string): Promise<string | null> {
@@ -115,8 +113,9 @@ function weekBucket(date: Date, now: Date): "this" | "last" | "older" {
 /**
  * Generate a compact timeline block (~100-150 tokens) from workspace files.
  */
-export async function generateTimeline(workspacePath: string): Promise<string> {
+export async function generateTimeline(workspacePath: string, locale: Locale): Promise<string> {
   const now = new Date();
+  const s = t(locale);
   const lines: string[] = [];
 
   // 1. Try to find birth date from IDENTITY.md or MEMORY.md
@@ -141,7 +140,7 @@ export async function generateTimeline(workspacePath: string): Promise<string> {
 
   if (birthDate) {
     const d = daysAgo(birthDate, now);
-    lines.push(`Active since: ${formatDate(birthDate)} (${d} days ago)`);
+    lines.push(s.timelineActiveSince(formatDate(birthDate, locale), d));
   }
 
   // 2. Scan memory directory for daily entries
@@ -151,7 +150,13 @@ export async function generateTimeline(workspacePath: string): Promise<string> {
   if (memoryDates.length > 0) {
     const first = memoryDates[0];
     const last = memoryDates[memoryDates.length - 1];
-    lines.push(`Memory files: ${memoryDates.length} daily entries spanning ${formatDate(first)} — ${formatDate(last)}`);
+    lines.push(
+      s.timelineMemoryFiles(
+        memoryDates.length,
+        formatDate(first, locale),
+        formatDate(last, locale),
+      ),
+    );
 
     // Categorize memory dates into this week / last week
     const thisWeekDates = memoryDates.filter((d) => weekBucket(d, now) === "this");
@@ -165,7 +170,7 @@ export async function generateTimeline(workspacePath: string): Promise<string> {
       if (content) {
         const summary = extractWeekSummary(content);
         if (summary) {
-          lines.push(`This week (${formatDate(now)}): ${summary}`);
+          lines.push(`${s.timelineThisWeek(formatDate(now, locale))}: ${summary}`);
         }
       }
     }
@@ -179,14 +184,16 @@ export async function generateTimeline(workspacePath: string): Promise<string> {
         if (summary) {
           const weekStart = lastWeekDates[0];
           const weekEnd = lastWeekDates[lastWeekDates.length - 1];
-          lines.push(`Last week (${formatDate(weekStart)}–${formatDate(weekEnd)}): ${summary}`);
+          lines.push(
+            `${s.timelineLastWeek(formatDate(weekStart, locale), formatDate(weekEnd, locale))}: ${summary}`,
+          );
         }
       }
     }
   }
 
   // 3. Current date/time
-  lines.push(`Current date: ${dayOfWeek(now)}, ${formatDate(now)}`);
+  lines.push(s.timelineCurrentDate(dayOfWeek(now, locale), formatDate(now, locale)));
 
   if (lines.length <= 1) {
     // Only current date — not enough to justify a timeline block
