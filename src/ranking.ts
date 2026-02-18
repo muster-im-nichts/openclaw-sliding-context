@@ -90,9 +90,67 @@ export function deduplicateAndRank(
     });
   }
 
-  // Sort by score descending, take top N
+  // Sort by score descending
   scored.sort((a, b) => b.finalScore - a.finalScore);
-  return scored.slice(0, params.maxEntries);
+
+  // Content-similarity dedup: if two entries are within 60min and share
+  // >60% of their significant words, keep only the higher-scored one.
+  const deduped = contentDedup(scored);
+
+  return deduped.slice(0, params.maxEntries);
+}
+
+/**
+ * Extract significant words (>3 chars) from a summary, lowercased.
+ */
+function significantWords(text: string): Set<string> {
+  return new Set(
+    text.toLowerCase()
+      .replace(/[^a-zäöüß0-9\s-]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 3),
+  );
+}
+
+/**
+ * Jaccard similarity between two word sets.
+ */
+function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 && b.size === 0) return 1;
+  let intersection = 0;
+  for (const w of a) if (b.has(w)) intersection++;
+  return intersection / (a.size + b.size - intersection);
+}
+
+/**
+ * Remove entries that are too similar to a higher-scored entry within a time window.
+ * This prevents the same topic (e.g., "blog fix") from consuming multiple slots.
+ */
+function contentDedup(entries: ScoredEntry[], windowMs = 3_600_000, threshold = 0.55): ScoredEntry[] {
+  const result: ScoredEntry[] = [];
+  const wordCache: Array<Set<string>> = [];
+
+  for (const entry of entries) {
+    const words = significantWords(entry.summary);
+    let isDuplicate = false;
+
+    for (let i = 0; i < result.length; i++) {
+      const existing = result[i];
+      // Only dedup within time window
+      if (Math.abs(entry.timestamp - existing.timestamp) > windowMs) continue;
+      if (jaccardSimilarity(words, wordCache[i]) >= threshold) {
+        isDuplicate = true;
+        break;
+      }
+    }
+
+    if (!isDuplicate) {
+      result.push(entry);
+      wordCache.push(words);
+    }
+  }
+
+  return result;
 }
 
 /**

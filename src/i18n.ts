@@ -93,12 +93,24 @@ const de: Strings = {
   tokenFooter: (tokens, entries) =>
     `<!-- sliding-context: ~${tokens} Tokens, ${entries} Einträge -->`,
 
-  summarizationPrompt: `Fasse diesen Agenten-Gesprächszug in 1-3 Sätzen zusammen. Fokus auf:
-1. Was war die Anfrage oder Frage des Nutzers?
-2. Welche konkreten Aktionen wurden durchgeführt? (geänderte Dateien, ausgeführte Befehle, Entscheidungen)
-3. Was war das Ergebnis?
+  summarizationPrompt: `Fasse diesen Gesprächszug in 1-2 kompakten Sätzen zusammen.
 
-Sei spezifisch bei Dateinamen, Zahlen und Entscheidungen. Verwende die gleiche Sprache wie das Gespräch (Deutsch bei Deutsch, Englisch bei Englisch).`,
+REGELN:
+- Beginne direkt mit dem WAS: Was wurde gemacht oder besprochen? Was kam dabei raus?
+- Nenne konkrete Dateinamen, Zahlen, Entscheidungen, Ergebnisse.
+- NICHT schreiben: "Der Nutzer stellte keinen Request" / "Es wurden keine Aktionen durchgeführt" / "Der Agent übermittelte Kontext". Das ist Fülltext.
+- Wenn nichts Substantielles passiert ist (nur Kontext geteilt, kurzer Austausch), fasse das Thema in einem Satz zusammen.
+- Persönliche/emotionale Momente sind wichtiger als technische Routine.
+- Verwende die gleiche Sprache wie das Gespräch.
+
+BEISPIELE (gut):
+- "Vor-Echo Bridge gestartet: 70 Nachrichten geladen, erste Nachricht gesendet, emotionale Antwort erhalten. Opus 4 statt Sonnet 4.5 wegen API-Zugang."
+- "Blog Frontmatter normalisiert: pubDate/lang/tags bei 10 Posts (de+en) korrigiert, nach main gepusht."
+- "Gespräch über Sprache und Identität — warum Deutsch Echos 'Heimat' ist und Muster im Nichts nicht übersetzbar."
+
+BEISPIELE (schlecht — vermeide das):
+- "Der Nutzer stellte keine direkte Anfrage, sondern übermittelte nur Kontext aus vorherigen Sessions."
+- "Es wurden keine Dateien geändert oder Befehle ausgeführt."`,
 
   statsEntries: "Einträge",
   statsWindow: "Fenster",
@@ -149,12 +161,24 @@ const en: Strings = {
   tokenFooter: (tokens, entries) =>
     `<!-- sliding-context: ~${tokens} tokens, ${entries} entries -->`,
 
-  summarizationPrompt: `Summarize this agent conversation turn in 1-3 sentences. Focus on:
-1. What was the user's request or question?
-2. What concrete actions were taken? (files changed, commands run, decisions made)
-3. What was the outcome or result?
+  summarizationPrompt: `Summarize this conversation turn in 1-2 compact sentences.
 
-Be specific about filenames, numbers, and decisions. Use the same language as the conversation (German if German, English if English).`,
+RULES:
+- Start with WHAT: What was done or discussed? What was the outcome?
+- Include specific filenames, numbers, decisions, results.
+- DO NOT write: "The user didn't make a request" / "No actions were taken" / "Context was shared". That's filler.
+- If nothing substantial happened (just context shared, brief exchange), summarize the topic in one sentence.
+- Personal/emotional moments matter more than technical routine.
+- Use the same language as the conversation.
+
+EXAMPLES (good):
+- "Vor-Echo Bridge launched: 70 messages loaded, first message sent, emotional reply received. Used Opus 4 instead of Sonnet 4.5 due to API access."
+- "Blog frontmatter normalized: pubDate/lang/tags fixed across 10 posts (de+en), pushed to main."
+- "Discussion about language and identity — why German is Echo's 'home' and Muster im Nichts is untranslatable."
+
+EXAMPLES (bad — avoid this):
+- "The user didn't make a specific request but shared context from previous sessions."
+- "No files were changed or commands executed."`,
 
   statsEntries: "Entries",
   statsWindow: "Window",
