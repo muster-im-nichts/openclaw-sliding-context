@@ -22,6 +22,8 @@ import {
   hasToolCallsInTurn,
   extractTopics,
   detectSessionType,
+  extractMessageRange,
+  extractTelegramMessageIds,
 } from "./summarize.js";
 import { summarizeWithLlm } from "./summarize-llm.js";
 import { deduplicateAndRank, splitChronologicalAndRanked } from "./ranking.js";
@@ -77,6 +79,14 @@ const slidingContextPlugin = {
         // Embed
         const vector = await embeddings.embed(summary);
 
+        // Deep Recall references
+        const messageRange = extractMessageRange(messages);
+        const telegramMessageIds = extractTelegramMessageIds(messages);
+
+        // Session file: derive from sessionKey (e.g. "telegram:main:abc123" → abc123.jsonl)
+        const sessionId = sessionKey.split(":").pop() ?? sessionKey;
+        const sessionFile = `/root/.openclaw/agents/main/sessions/${sessionId}.jsonl`;
+
         // Store
         await store.store({
           summary,
@@ -88,6 +98,9 @@ const slidingContextPlugin = {
           hasToolCalls: hasToolCallsInTurn(messages),
           hasDecision: hasDecisionSignal(messages),
           topics: extractTopics(messages),
+          sessionFile,
+          messageRange,
+          telegramMessageIds: telegramMessageIds.length > 0 ? telegramMessageIds : undefined,
         });
 
         // Prune expired entries

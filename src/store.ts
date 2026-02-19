@@ -52,6 +52,9 @@ export class ContextStore {
           hasToolCalls: false,
           hasDecision: false,
           topics: "",
+          sessionFile: "",
+          messageRange: "",
+          telegramMessageIds: "",
         },
       ]);
       await this.table.delete('id = "__schema__"');
@@ -62,10 +65,13 @@ export class ContextStore {
     await this.init();
     const full: ContextEntry = { ...entry, id: randomUUID() };
 
-    // LanceDB doesn't support array-of-string columns well, serialize topics
+    // LanceDB doesn't support nested objects/arrays well, serialize to JSON strings
     await this.table!.add([{
       ...full,
       topics: JSON.stringify(full.topics),
+      messageRange: full.messageRange ? JSON.stringify(full.messageRange) : "",
+      telegramMessageIds: full.telegramMessageIds ? JSON.stringify(full.telegramMessageIds) : "",
+      sessionFile: full.sessionFile ?? "",
     }]);
 
     return full;
@@ -140,6 +146,22 @@ export class ContextStore {
       else if (Array.isArray(raw)) topics = raw as string[];
     } catch { /* empty */ }
 
+    let messageRange: ContextEntry["messageRange"];
+    try {
+      const raw = row.messageRange;
+      if (typeof raw === "string" && raw.length > 0) messageRange = JSON.parse(raw);
+    } catch { /* empty */ }
+
+    let telegramMessageIds: ContextEntry["telegramMessageIds"];
+    try {
+      const raw = row.telegramMessageIds;
+      if (typeof raw === "string" && raw.length > 0) telegramMessageIds = JSON.parse(raw);
+    } catch { /* empty */ }
+
+    const sessionFile = typeof row.sessionFile === "string" && row.sessionFile.length > 0
+      ? row.sessionFile
+      : undefined;
+
     return {
       id: row.id as string,
       summary: row.summary as string,
@@ -151,6 +173,9 @@ export class ContextStore {
       hasToolCalls: Boolean(row.hasToolCalls),
       hasDecision: Boolean(row.hasDecision),
       topics,
+      sessionFile,
+      messageRange,
+      telegramMessageIds,
     };
   }
 }

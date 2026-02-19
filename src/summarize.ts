@@ -3,7 +3,7 @@
  * Extracts user intent, tools used, and outcome from messages.
  */
 
-import type { SessionType } from "./types.js";
+import type { SessionType, MessageRange } from "./types.js";
 
 // ============================================================================
 // Message helpers
@@ -165,4 +165,34 @@ export function detectSessionType(sessionKey: string): SessionType {
   if (sessionKey.includes(":isolated:") || sessionKey.includes("spawn")) return "isolated";
   if (sessionKey.includes(":main")) return "dm";
   return "unknown";
+}
+
+// ============================================================================
+// Deep Recall: message range & telegram IDs
+// ============================================================================
+
+export function extractMessageRange(messages: unknown[]): MessageRange | undefined {
+  const msgs = messages as MessageLike[];
+  if (msgs.length === 0) return undefined;
+
+  const firstId = msgs[0].id;
+  const lastId = msgs[msgs.length - 1].id;
+
+  if (typeof firstId !== "string" || typeof lastId !== "string") return undefined;
+
+  return { startId: firstId, endId: lastId };
+}
+
+const TELEGRAM_MSG_ID_PATTERN = /\[message_id:\s*(\d+)\]/g;
+
+export function extractTelegramMessageIds(messages: unknown[]): number[] {
+  const ids = new Set<number>();
+  for (const msg of messages as MessageLike[]) {
+    if (msg.role !== "user") continue;
+    const text = textContent(msg);
+    for (const match of text.matchAll(TELEGRAM_MSG_ID_PATTERN)) {
+      ids.add(Number(match[1]));
+    }
+  }
+  return ids.size > 0 ? [...ids] : [];
 }

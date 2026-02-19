@@ -4,6 +4,11 @@
 
 export type SessionType = "dm" | "group" | "cron" | "webhook" | "isolated" | "unknown";
 
+export type MessageRange = {
+  startId: string;
+  endId: string;
+};
+
 export type ContextEntry = {
   id: string;
   summary: string;
@@ -15,6 +20,9 @@ export type ContextEntry = {
   hasToolCalls: boolean;
   hasDecision: boolean;
   topics: string[];
+  sessionFile?: string;
+  messageRange?: MessageRange;
+  telegramMessageIds?: number[];
 };
 
 export type ContextSearchResult = {
