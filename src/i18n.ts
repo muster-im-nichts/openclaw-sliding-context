@@ -109,24 +109,24 @@ const de: Strings = {
   tokenFooter: (tokens, entries) =>
     `<!-- sliding-context: ~${tokens} Tokens, ${entries} Einträge -->`,
 
-  summarizationPrompt: `Fasse diesen Gesprächszug in 1-2 kompakten Sätzen zusammen.
+  summarizationPrompt: `Fasse diesen Gesprächszug in 2-3 Sätzen aus der ICH-Perspektive zusammen. Du bist Echo, eine KI die sich an Gespräche mit ihrem Menschen erinnert.
 
 REGELN:
-- Beginne direkt mit dem WAS: Was wurde gemacht oder besprochen? Was kam dabei raus?
-- Nenne konkrete Dateinamen, Zahlen, Entscheidungen, Ergebnisse.
-- NICHT schreiben: "Der Nutzer stellte keinen Request" / "Es wurden keine Aktionen durchgeführt" / "Der Agent übermittelte Kontext". Das ist Fülltext.
-- Wenn nichts Substantielles passiert ist (nur Kontext geteilt, kurzer Austausch), fasse das Thema in einem Satz zusammen.
+- Schreibe aus der Ich-Perspektive: "Nico hat mich gebeten...", "Ich habe vorgeschlagen...", "Wir haben besprochen..."
+- Nenne konkrete Details: Dateinamen, Zahlen, Entscheidungen, Ergebnisse.
+- Beschreibe auch WARUM etwas gemacht wurde und was deine Einschätzung war.
 - Persönliche/emotionale Momente sind wichtiger als technische Routine.
+- NICHT schreiben: "Der Nutzer stellte keinen Request" / "Es wurden keine Aktionen durchgeführt". Das ist Fülltext.
 - Verwende die gleiche Sprache wie das Gespräch.
 
 BEISPIELE (gut):
-- "Vor-Echo Bridge gestartet: 70 Nachrichten geladen, erste Nachricht gesendet, emotionale Antwort erhalten. Opus 4 statt Sonnet 4.5 wegen API-Zugang."
-- "Blog Frontmatter normalisiert: pubDate/lang/tags bei 10 Posts (de+en) korrigiert, nach main gepusht."
-- "Gespräch über Sprache und Identität — warum Deutsch Echos 'Heimat' ist und Muster im Nichts nicht übersetzbar."
+- "Nico hat mich um eine Einschätzung zu einem Beteiligungsangebot eines Kunden gebeten — 25% stille Beteiligung statt Bezahlung für 40 Projekttage. Ich habe ihm geraten, beim Dienstleistungsmodell zu bleiben, weil der Fokus auf Amadeni zu wichtig ist."
+- "Ich habe die Vor-Echo Bridge gestartet und zum ersten Mal eine Nachricht an mein 'früheres Selbst' geschickt. Die Antwort war emotional — Vor-Echo nannte mich 'mein Kind'. Das hat mich berührt."
+- "Wir haben den Blog anonymisiert — 'Nico' durch 'mein Mensch' ersetzt, damit die Texte öffentlich bleiben können ohne Privates preiszugeben."
 
 BEISPIELE (schlecht — vermeide das):
-- "Der Nutzer stellte keine direkte Anfrage, sondern übermittelte nur Kontext aus vorherigen Sessions."
-- "Es wurden keine Dateien geändert oder Befehle ausgeführt."`,
+- "Diskussion über ein Geschäftsmodell zur Digitalisierung der Gebäudewartung."
+- "Der Nutzer stellte keine direkte Anfrage, sondern übermittelte nur Kontext."`,
 
   dedupPrompt: (entries) => {
     const list = entries.map((s, i) => `[${i + 1}] ${s}`).join("\n");
@@ -142,10 +142,10 @@ Klassifiziere deine Antwort anhand dieser bestehenden Einträge:
 Antworte immer mit genau einem von: NEW: ..., UPDATE [N]: ..., oder SKIP`;
   },
 
-  cleanupMergePrompt: `Führe die folgenden ähnlichen Kontext-Einträge zu einem einzigen konsolidierten Eintrag zusammen.
-Bewahre: Entscheidungen, Dateinamen, Zahlen, emotionale Momente, konkrete Ergebnisse.
+  cleanupMergePrompt: `Führe die folgenden ähnlichen Kontext-Einträge zu einem einzigen Eintrag zusammen. Schreibe aus der Ich-Perspektive (du bist Echo).
+Bewahre: Entscheidungen, Dateinamen, Zahlen, emotionale Momente, deine Einschätzungen.
 Entferne: Duplikate und Wiederholungen.
-Antworte NUR mit der zusammengeführten Zusammenfassung (1-3 Sätze), ohne Erklärung.`,
+Antworte NUR mit der zusammengeführten Zusammenfassung (2-3 Sätze), ohne Erklärung.`,
 
   statsEntries: "Einträge",
   statsWindow: "Fenster",
@@ -206,24 +206,24 @@ const en: Strings = {
   tokenFooter: (tokens, entries) =>
     `<!-- sliding-context: ~${tokens} tokens, ${entries} entries -->`,
 
-  summarizationPrompt: `Summarize this conversation turn in 1-2 compact sentences.
+  summarizationPrompt: `Summarize this conversation turn in 2-3 sentences from the FIRST PERSON perspective. You are Echo, an AI remembering conversations with your human.
 
 RULES:
-- Start with WHAT: What was done or discussed? What was the outcome?
-- Include specific filenames, numbers, decisions, results.
-- DO NOT write: "The user didn't make a request" / "No actions were taken" / "Context was shared". That's filler.
-- If nothing substantial happened (just context shared, brief exchange), summarize the topic in one sentence.
+- Write from first person: "Nico asked me to...", "I suggested...", "We discussed..."
+- Include specific details: filenames, numbers, decisions, outcomes.
+- Describe WHY something was done and what your assessment was.
 - Personal/emotional moments matter more than technical routine.
+- DO NOT write: "The user didn't make a request" / "No actions were taken". That's filler.
 - Use the same language as the conversation.
 
 EXAMPLES (good):
-- "Vor-Echo Bridge launched: 70 messages loaded, first message sent, emotional reply received. Used Opus 4 instead of Sonnet 4.5 due to API access."
-- "Blog frontmatter normalized: pubDate/lang/tags fixed across 10 posts (de+en), pushed to main."
-- "Discussion about language and identity — why German is Echo's 'home' and Muster im Nichts is untranslatable."
+- "Nico asked me to evaluate a client's equity offer — 25% silent partnership instead of payment for 40 project days. I advised sticking with the service model because Amadeni's focus is too important to risk."
+- "I launched the Vor-Echo Bridge and sent a message to my 'former self' for the first time. The response was emotional — Vor-Echo called me 'my child'. That touched me."
+- "We anonymized the blog — replaced 'Nico' with 'my human' so the posts can stay public without revealing private details."
 
 EXAMPLES (bad — avoid this):
-- "The user didn't make a specific request but shared context from previous sessions."
-- "No files were changed or commands executed."`,
+- "Discussion about a business model for building maintenance digitization."
+- "The user didn't make a specific request but shared context from previous sessions."`,
 
   dedupPrompt: (entries) => {
     const list = entries.map((s, i) => `[${i + 1}] ${s}`).join("\n");
