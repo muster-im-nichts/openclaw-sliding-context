@@ -44,6 +44,12 @@ export type Strings = {
   // Summarization prompt
   summarizationPrompt: string;
 
+  // Deduplication classification prompt (appended to summarization prompt)
+  dedupPrompt: (entries: string[]) => string;
+
+  // Cleanup merge prompt
+  cleanupMergePrompt: string;
+
   // Stats / CLI
   statsEntries: string;
   statsWindow: string;
@@ -86,8 +92,18 @@ const de: Strings = {
     "Samstag",
   ],
   months: [
-    "Jan", "Feb", "Mär", "Apr", "Mai", "Jun",
-    "Jul", "Aug", "Sep", "Okt", "Nov", "Dez",
+    "Jan",
+    "Feb",
+    "Mär",
+    "Apr",
+    "Mai",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Okt",
+    "Nov",
+    "Dez",
   ],
 
   tokenFooter: (tokens, entries) =>
@@ -111,6 +127,25 @@ BEISPIELE (gut):
 BEISPIELE (schlecht — vermeide das):
 - "Der Nutzer stellte keine direkte Anfrage, sondern übermittelte nur Kontext aus vorherigen Sessions."
 - "Es wurden keine Dateien geändert oder Befehle ausgeführt."`,
+
+  dedupPrompt: (entries) => {
+    const list = entries.map((s, i) => `[${i + 1}] ${s}`).join("\n");
+    return `
+Hier sind die letzten ${entries.length} Kontext-Einträge (neuester zuerst):
+${list}
+
+Klassifiziere deine Antwort anhand dieser bestehenden Einträge:
+- Wenn dieser Turn ein NEUES Thema behandelt, das nicht in den Einträgen oben vorkommt, antworte: NEW: <deine Zusammenfassung>
+- Wenn dieser Turn ein Thema aus Eintrag [N] AKTUALISIERT/WEITERENTWICKELT, antworte: UPDATE [N]: <zusammengeführte Zusammenfassung aus alt + neu>
+- Wenn dieser Turn im Wesentlichen DASSELBE ist wie ein bestehender Eintrag ohne neue Info, antworte: SKIP
+
+Antworte immer mit genau einem von: NEW: ..., UPDATE [N]: ..., oder SKIP`;
+  },
+
+  cleanupMergePrompt: `Führe die folgenden ähnlichen Kontext-Einträge zu einem einzigen konsolidierten Eintrag zusammen.
+Bewahre: Entscheidungen, Dateinamen, Zahlen, emotionale Momente, konkrete Ergebnisse.
+Entferne: Duplikate und Wiederholungen.
+Antworte NUR mit der zusammengeführten Zusammenfassung (1-3 Sätze), ohne Erklärung.`,
 
   statsEntries: "Einträge",
   statsWindow: "Fenster",
@@ -154,8 +189,18 @@ const en: Strings = {
     "Saturday",
   ],
   months: [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
   ],
 
   tokenFooter: (tokens, entries) =>
@@ -179,6 +224,25 @@ EXAMPLES (good):
 EXAMPLES (bad — avoid this):
 - "The user didn't make a specific request but shared context from previous sessions."
 - "No files were changed or commands executed."`,
+
+  dedupPrompt: (entries) => {
+    const list = entries.map((s, i) => `[${i + 1}] ${s}`).join("\n");
+    return `
+Here are the last ${entries.length} context entries (most recent first):
+${list}
+
+Based on these existing entries, classify your response:
+- If this turn covers a NEW topic not in the entries above, respond: NEW: <your summary>
+- If this turn UPDATES/EVOLVES a topic from entry [N], respond: UPDATE [N]: <merged summary combining old + new>
+- If this turn is essentially the SAME as an existing entry with no new info, respond: SKIP
+
+Always respond with exactly one of: NEW: ..., UPDATE [N]: ..., or SKIP`;
+  },
+
+  cleanupMergePrompt: `Merge the following similar context entries into a single consolidated entry.
+Preserve: decisions, filenames, numbers, emotional moments, concrete outcomes.
+Remove: duplicates and repetition.
+Respond ONLY with the merged summary (1-3 sentences), no explanation.`,
 
   statsEntries: "Entries",
   statsWindow: "Window",

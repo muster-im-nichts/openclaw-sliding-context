@@ -25,7 +25,7 @@ import {
   extractMessageRange,
   extractTelegramMessageIds,
 } from "./summarize.js";
-import { summarizeWithLlm } from "./summarize-llm.js";
+import { summarizeWithLlm, type SummarizeResult } from "./summarize-llm.js";
 import { deduplicateAndRank, splitChronologicalAndRanked } from "./ranking.js";
 import { formatSlidingContext } from "./format.js";
 import { generateTimeline } from "./timeline.js";
@@ -41,9 +41,14 @@ const slidingContextPlugin = {
     const resolvedDbPath = api.resolvePath(cfg.dbPath);
     const vectorDim = vectorDimsForModel(cfg.embedding.model);
     const store = new ContextStore(resolvedDbPath, vectorDim);
-    const embeddings = new Embeddings(cfg.embedding.apiKey, cfg.embedding.model);
+    const embeddings = new Embeddings(
+      cfg.embedding.apiKey,
+      cfg.embedding.model,
+    );
 
-    api.logger.info(`sliding-context: registered (db: ${resolvedDbPath}, window: ${cfg.windowHours}h)`);
+    api.logger.info(
+      `sliding-context: registered (db: ${resolvedDbPath}, window: ${cfg.windowHours}h)`,
+    );
 
     // ========================================================================
     // Capture: index turn summaries after every agent turn
@@ -57,24 +62,56 @@ const slidingContextPlugin = {
       if (cfg.skipTrivial && isTrivialTurn(messages)) return;
 
       // Skip excluded sessions
-      const sessionKey = (event as Record<string, unknown>).sessionKey as string | undefined ?? "unknown";
+      const sessionKey =
+        ((event as Record<string, unknown>).sessionKey as string | undefined) ??
+        "unknown";
       if (cfg.skipSessions.includes(sessionKey)) return;
 
       try {
+        // Load recent entries for dedup context (LLM mode only)
+        const recentEntries =
+          cfg.summarization.mode === "llm"
+            ? await store.getRecent(3, cfg.windowHours)
+            : [];
+
         // Extract summary (LLM or rule-based)
-        let summary: string;
+        let result: SummarizeResult;
         if (cfg.summarization.mode === "llm") {
           const llmApiKey = cfg.summarization.apiKey ?? cfg.embedding.apiKey;
-          summary = await summarizeWithLlm(messages, {
-            apiKey: llmApiKey,
-            model: cfg.summarization.model,
-            maxChars: cfg.summaryMaxChars,
-            locale: cfg.locale,
-          }, api.logger);
+          result = await summarizeWithLlm(
+            messages,
+            {
+              apiKey: llmApiKey,
+              model: cfg.summarization.model,
+              maxChars: cfg.summaryMaxChars,
+              locale: cfg.locale,
+            },
+            api.logger,
+            recentEntries,
+          );
         } else {
-          summary = extractTurnSummary(messages, cfg.summaryMaxChars);
+          const summary = extractTurnSummary(messages, cfg.summaryMaxChars);
+          result = { action: "new", summary };
         }
+
+        // Handle SKIP — nothing to store
+        if (result.action === "skip") {
+          api.logger.debug?.(
+            `sliding-context: skipped duplicate turn from ${sessionKey}`,
+          );
+          return;
+        }
+
+        const { summary } = result;
         if (!summary || summary.length < 10) return;
+
+        // Handle UPDATE — delete the old entry first
+        if (result.action === "update" && result.replaceId) {
+          await store.deleteById(result.replaceId);
+          api.logger.debug?.(
+            `sliding-context: updating entry ${result.replaceId} from ${sessionKey}`,
+          );
+        }
 
         // Embed
         const vector = await embeddings.embed(summary);
@@ -93,20 +130,23 @@ const slidingContextPlugin = {
           vector,
           sessionKey,
           sessionType: detectSessionType(sessionKey),
-          channel: (event as Record<string, unknown>).channel as string ?? "",
+          channel: ((event as Record<string, unknown>).channel as string) ?? "",
           timestamp: Date.now(),
           hasToolCalls: hasToolCallsInTurn(messages),
           hasDecision: hasDecisionSignal(messages),
           topics: extractTopics(messages),
           sessionFile,
           messageRange,
-          telegramMessageIds: telegramMessageIds.length > 0 ? telegramMessageIds : undefined,
+          telegramMessageIds:
+            telegramMessageIds.length > 0 ? telegramMessageIds : undefined,
         });
 
         // Prune expired entries
         await store.pruneOlderThan(cfg.windowHours);
 
-        api.logger.debug?.(`sliding-context: captured turn from ${sessionKey} (${summary.length} chars)`);
+        api.logger.debug?.(
+          `sliding-context: captured turn from ${sessionKey} (${result.action}, ${summary.length} chars)`,
+        );
       } catch (err) {
         api.logger.warn(`sliding-context: capture failed: ${String(err)}`);
       }
@@ -120,7 +160,9 @@ const slidingContextPlugin = {
       const prompt = event.prompt;
       if (!prompt || prompt.length < 5) return;
 
-      const sessionKey = (event as Record<string, unknown>).sessionKey as string | undefined ?? "unknown";
+      const sessionKey =
+        ((event as Record<string, unknown>).sessionKey as string | undefined) ??
+        "unknown";
 
       try {
         // Three-pass retrieval
@@ -164,8 +206,10 @@ const slidingContextPlugin = {
         let fullContext = context;
         if (cfg.timeline.enabled) {
           try {
-            const workspacePath = (api as Record<string, unknown>).workspace as string | undefined
-              ?? cfg.timeline.workspacePath;
+            const workspacePath =
+              ((api as Record<string, unknown>).workspace as
+                | string
+                | undefined) ?? cfg.timeline.workspacePath;
             const timeline = await generateTimeline(workspacePath, cfg.locale);
             if (timeline) {
               fullContext = context + "\n" + timeline;
@@ -176,7 +220,9 @@ const slidingContextPlugin = {
         }
 
         const totalEntries = chronological.length + ranked.length;
-        api.logger.info?.(`sliding-context: injecting ${totalEntries} entries (${chronological.length} chrono + ${ranked.length} ranked) into ${sessionKey}`);
+        api.logger.info?.(
+          `sliding-context: injecting ${totalEntries} entries (${chronological.length} chrono + ${ranked.length} ranked) into ${sessionKey}`,
+        );
 
         return { prependContext: fullContext };
       } catch (err) {
@@ -191,26 +237,35 @@ const slidingContextPlugin = {
     api.registerTool(
       {
         name: "sliding_context_search",
-        description: "Search recent cross-session context. Use when you need to recall what happened recently across different sessions.",
+        description:
+          "Search recent cross-session context. Use when you need to recall what happened recently across different sessions.",
         parameters: Type.Object({
           query: Type.String({ description: "Search query" }),
-          limit: Type.Optional(Type.Number({ description: "Max results (default: 5)" })),
+          limit: Type.Optional(
+            Type.Number({ description: "Max results (default: 5)" }),
+          ),
         }),
         async execute(_id, params) {
-          const { query, limit = 5 } = params as { query: string; limit?: number };
+          const { query, limit = 5 } = params as {
+            query: string;
+            limit?: number;
+          };
 
           const vector = await embeddings.embed(query);
           const results = await store.search(vector, limit, 0.2);
 
           if (results.length === 0) {
-            return { content: [{ type: "text", text: "No recent context found." }] };
+            return {
+              content: [{ type: "text", text: "No recent context found." }],
+            };
           }
 
           const now = Date.now();
           const text = results
             .map((r, i) => {
               const ago = Math.floor((now - r.entry.timestamp) / 60_000);
-              const agoStr = ago < 60 ? `${ago}min` : `${Math.floor(ago / 60)}h`;
+              const agoStr =
+                ago < 60 ? `${ago}min` : `${Math.floor(ago / 60)}h`;
               return `${i + 1}. [${agoStr} ago · ${r.entry.sessionType}] ${r.entry.summary} (${(r.score * 100).toFixed(0)}%)`;
             })
             .join("\n");
@@ -224,15 +279,18 @@ const slidingContextPlugin = {
     api.registerTool(
       {
         name: "sliding_context_stats",
-        description: "Show sliding context statistics (entry count, window size).",
+        description:
+          "Show sliding context statistics (entry count, window size).",
         parameters: Type.Object({}),
         async execute() {
           const count = await store.count();
           return {
-            content: [{
-              type: "text",
-              text: `Sliding Context: ${count} entries, ${cfg.windowHours}h window (${cfg.recentWindowHours}h chronological), ${cfg.recentCount} recent + ${cfg.relevantCount} relevant per turn, timeline: ${cfg.timeline.enabled ? "on" : "off"}`,
-            }],
+            content: [
+              {
+                type: "text",
+                text: `Sliding Context: ${count} entries, ${cfg.windowHours}h window (${cfg.recentWindowHours}h chronological), ${cfg.recentCount} recent + ${cfg.relevantCount} relevant per turn, timeline: ${cfg.timeline.enabled ? "on" : "off"}`,
+              },
+            ],
           };
         },
       },
@@ -256,10 +314,16 @@ const slidingContextPlugin = {
             const s = t(cfg.locale);
             const count = await store.count();
             console.log(`${s.statsEntries}: ${count}`);
-            console.log(`${s.statsWindow}: ${cfg.windowHours}h (recent: ${cfg.recentWindowHours}h chronological)`);
-            console.log(`Inject: ${cfg.recentCount} recent + ${cfg.relevantCount} relevant (max ${cfg.maxInjectEntries}, max ${cfg.maxInjectTokens} tokens)`);
+            console.log(
+              `${s.statsWindow}: ${cfg.windowHours}h (recent: ${cfg.recentWindowHours}h chronological)`,
+            );
+            console.log(
+              `Inject: ${cfg.recentCount} recent + ${cfg.relevantCount} relevant (max ${cfg.maxInjectEntries}, max ${cfg.maxInjectTokens} tokens)`,
+            );
             console.log(`Summary: max ${cfg.summaryMaxChars} chars`);
-            console.log(`${s.statsTimeline}: ${cfg.timeline.enabled ? "enabled" : "disabled"}`);
+            console.log(
+              `${s.statsTimeline}: ${cfg.timeline.enabled ? "enabled" : "disabled"}`,
+            );
             console.log(`Locale: ${cfg.locale}`);
             console.log(`DB: ${resolvedDbPath}`);
           });
@@ -268,11 +332,15 @@ const slidingContextPlugin = {
           .description("List recent context entries")
           .option("--limit <n>", "Max entries", "10")
           .action(async (opts) => {
-            const entries = await store.getRecent(parseInt(opts.limit), cfg.windowHours);
+            const entries = await store.getRecent(
+              parseInt(opts.limit),
+              cfg.windowHours,
+            );
             const now = Date.now();
             for (const e of entries) {
               const ago = Math.floor((now - e.timestamp) / 60_000);
-              const agoStr = ago < 60 ? `${ago}min` : `${Math.floor(ago / 60)}h`;
+              const agoStr =
+                ago < 60 ? `${ago}min` : `${Math.floor(ago / 60)}h`;
               console.log(`[${agoStr} ago · ${e.sessionType}] ${e.summary}`);
             }
             if (entries.length === 0) console.log("No entries in window.");
@@ -295,7 +363,9 @@ const slidingContextPlugin = {
     api.registerService({
       id: "sliding-context",
       start: () => {
-        api.logger.info(`sliding-context: service started (window: ${cfg.windowHours}h, db: ${resolvedDbPath})`);
+        api.logger.info(
+          `sliding-context: service started (window: ${cfg.windowHours}h, db: ${resolvedDbPath})`,
+        );
       },
       stop: () => {
         api.logger.info("sliding-context: stopped");

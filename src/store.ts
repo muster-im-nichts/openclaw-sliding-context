@@ -66,18 +66,28 @@ export class ContextStore {
     const full: ContextEntry = { ...entry, id: randomUUID() };
 
     // LanceDB doesn't support nested objects/arrays well, serialize to JSON strings
-    await this.table!.add([{
-      ...full,
-      topics: JSON.stringify(full.topics),
-      messageRange: full.messageRange ? JSON.stringify(full.messageRange) : "",
-      telegramMessageIds: full.telegramMessageIds ? JSON.stringify(full.telegramMessageIds) : "",
-      sessionFile: full.sessionFile ?? "",
-    }]);
+    await this.table!.add([
+      {
+        ...full,
+        topics: JSON.stringify(full.topics),
+        messageRange: full.messageRange
+          ? JSON.stringify(full.messageRange)
+          : "",
+        telegramMessageIds: full.telegramMessageIds
+          ? JSON.stringify(full.telegramMessageIds)
+          : "",
+        sessionFile: full.sessionFile ?? "",
+      },
+    ]);
 
     return full;
   }
 
-  async search(vector: number[], limit: number, minScore: number): Promise<ContextSearchResult[]> {
+  async search(
+    vector: number[],
+    limit: number,
+    minScore: number,
+  ): Promise<ContextSearchResult[]> {
     await this.init();
     const rows = await this.table!.vectorSearch(vector).limit(limit).toArray();
 
@@ -100,15 +110,28 @@ export class ContextStore {
     // LanceDB doesn't have great filter support, so we fetch more and filter in JS
     // With 7-day windows we need a higher overfetch factor
     const overfetch = Math.max(limit * 5, 100);
-    const rows = await this.table!.query()
-      .limit(overfetch)
-      .toArray();
+    const rows = await this.table!.query().limit(overfetch).toArray();
 
     return rows
       .map((row) => this.rowToEntry(row))
       .filter((e) => e.timestamp >= cutoff)
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, limit);
+  }
+
+  async deleteById(id: string): Promise<void> {
+    await this.init();
+    try {
+      await this.table!.delete(`id = '${id}'`);
+    } catch {
+      // entry might not exist
+    }
+  }
+
+  async getAll(): Promise<ContextEntry[]> {
+    await this.init();
+    const rows = await this.table!.query().toArray();
+    return rows.map((row) => this.rowToEntry(row));
   }
 
   async pruneOlderThan(hours: number): Promise<number> {
@@ -144,30 +167,40 @@ export class ContextStore {
       const raw = row.topics;
       if (typeof raw === "string") topics = JSON.parse(raw);
       else if (Array.isArray(raw)) topics = raw as string[];
-    } catch { /* empty */ }
+    } catch {
+      /* empty */
+    }
 
     let messageRange: ContextEntry["messageRange"];
     try {
       const raw = row.messageRange;
-      if (typeof raw === "string" && raw.length > 0) messageRange = JSON.parse(raw);
-    } catch { /* empty */ }
+      if (typeof raw === "string" && raw.length > 0)
+        messageRange = JSON.parse(raw);
+    } catch {
+      /* empty */
+    }
 
     let telegramMessageIds: ContextEntry["telegramMessageIds"];
     try {
       const raw = row.telegramMessageIds;
-      if (typeof raw === "string" && raw.length > 0) telegramMessageIds = JSON.parse(raw);
-    } catch { /* empty */ }
+      if (typeof raw === "string" && raw.length > 0)
+        telegramMessageIds = JSON.parse(raw);
+    } catch {
+      /* empty */
+    }
 
-    const sessionFile = typeof row.sessionFile === "string" && row.sessionFile.length > 0
-      ? row.sessionFile
-      : undefined;
+    const sessionFile =
+      typeof row.sessionFile === "string" && row.sessionFile.length > 0
+        ? row.sessionFile
+        : undefined;
 
     return {
       id: row.id as string,
       summary: row.summary as string,
       vector: row.vector as number[],
       sessionKey: row.sessionKey as string,
-      sessionType: (row.sessionType as ContextEntry["sessionType"]) ?? "unknown",
+      sessionType:
+        (row.sessionType as ContextEntry["sessionType"]) ?? "unknown",
       channel: (row.channel as string) ?? "",
       timestamp: row.timestamp as number,
       hasToolCalls: Boolean(row.hasToolCalls),
