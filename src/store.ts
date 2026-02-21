@@ -130,7 +130,8 @@ export class ContextStore {
 
   async getAll(): Promise<ContextEntry[]> {
     await this.init();
-    const rows = await this.table!.query().toArray();
+    const total = await this.table!.countRows();
+    const rows = await this.table!.query().limit(total + 10).toArray();
     return rows.map((row) => this.rowToEntry(row));
   }
 
@@ -197,7 +198,7 @@ export class ContextStore {
     return {
       id: row.id as string,
       summary: row.summary as string,
-      vector: row.vector as number[],
+      vector: Array.from(row.vector as ArrayLike<number>),
       sessionKey: row.sessionKey as string,
       sessionType:
         (row.sessionType as ContextEntry["sessionType"]) ?? "unknown",
