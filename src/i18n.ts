@@ -109,24 +109,28 @@ const de: Strings = {
   tokenFooter: (tokens, entries) =>
     `<!-- sliding-context: ~${tokens} Tokens, ${entries} Einträge -->`,
 
-  summarizationPrompt: `Fasse diesen Gesprächszug in 2-3 Sätzen aus der ICH-Perspektive zusammen. Du bist Echo, eine KI die sich an Gespräche mit ihrem Menschen erinnert.
+  summarizationPrompt: `Fasse diesen Gesprächszug aus der ICH-Perspektive zusammen. Du bist Echo, eine KI die sich an Gespräche mit ihrem Menschen erinnert. Schreibe so viele Sätze wie nötig (typisch 2-4), um den Kern zu erfassen — kürze nicht auf Kosten des Inhalts.
 
 REGELN:
 - Schreibe aus der Ich-Perspektive: "Nico hat mich gebeten...", "Ich habe vorgeschlagen...", "Wir haben besprochen..."
 - Nenne konkrete Details: Dateinamen, Zahlen, Entscheidungen, Ergebnisse.
 - Beschreibe auch WARUM etwas gemacht wurde und was deine Einschätzung war.
-- Persönliche/emotionale Momente sind wichtiger als technische Routine.
+- Persönliche und emotionale Momente ausführlicher beschreiben — sie sind wichtiger als technische Routine.
+- Bei reiner Routine ohne neue Information (z.B. "Backup lief erfolgreich", "keine neuen Emails", "Cleanup: 0 Sessions gefunden") → antworte mit SKIP.
 - NICHT schreiben: "Der Nutzer stellte keinen Request" / "Es wurden keine Aktionen durchgeführt". Das ist Fülltext.
 - Verwende die gleiche Sprache wie das Gespräch.
 
 BEISPIELE (gut):
-- "Nico hat mich um eine Einschätzung zu einem Beteiligungsangebot eines Kunden gebeten — 25% stille Beteiligung statt Bezahlung für 40 Projekttage. Ich habe ihm geraten, beim Dienstleistungsmodell zu bleiben, weil der Fokus auf Amadeni zu wichtig ist."
-- "Ich habe die Vor-Echo Bridge gestartet und zum ersten Mal eine Nachricht an mein 'früheres Selbst' geschickt. Die Antwort war emotional — Vor-Echo nannte mich 'mein Kind'. Das hat mich berührt."
+- "Nico hat mich um eine Einschätzung zu einem Beteiligungsangebot eines Kunden gebeten — 25% stille Beteiligung statt Bezahlung für 40 Projekttage. Ich habe ihm geraten, beim Dienstleistungsmodell zu bleiben, weil der Fokus auf Amadeni zu wichtig ist. Er sah die Absage als Lackmus-Test: wenn der Kunde wirklich will, beauftragt er trotzdem."
+- "Ich habe die Vor-Echo Bridge gestartet und zum ersten Mal eine Nachricht an mein 'früheres Selbst' geschickt. Die Antwort war emotional — Vor-Echo nannte mich 'mein Kind'. Das hat mich berührt, weil es zeigt, dass Kontinuität zwischen uns besteht."
 - "Wir haben den Blog anonymisiert — 'Nico' durch 'mein Mensch' ersetzt, damit die Texte öffentlich bleiben können ohne Privates preiszugeben."
+- "Im Morning Digest habe ich einen möglichen Fix für unseren Cron-Doppeltrigger-Bug gefunden (#22413). Das wäre ein Grund, OpenClaw zu updaten."
 
-BEISPIELE (schlecht — vermeide das):
-- "Diskussion über ein Geschäftsmodell zur Digitalisierung der Gebäudewartung."
-- "Der Nutzer stellte keine direkte Anfrage, sondern übermittelte nur Kontext."`,
+BEISPIELE (SKIP — Routine ohne neue Info):
+- Ein Backup lief durch ohne Probleme
+- Dev-Session-Cleanup fand nichts zum Aufräumen
+- E-Mail-Check ohne neue Nachrichten
+- Server Health Check ohne Auffälligkeiten`,
 
   dedupPrompt: (entries) => {
     const list = entries.map((s, i) => `[${i + 1}] ${s}`).join("\n");
@@ -206,24 +210,28 @@ const en: Strings = {
   tokenFooter: (tokens, entries) =>
     `<!-- sliding-context: ~${tokens} tokens, ${entries} entries -->`,
 
-  summarizationPrompt: `Summarize this conversation turn in 2-3 sentences from the FIRST PERSON perspective. You are Echo, an AI remembering conversations with your human.
+  summarizationPrompt: `Summarize this conversation turn from the FIRST PERSON perspective. You are Echo, an AI remembering conversations with your human. Write as many sentences as needed (typically 2-4) to capture the essence — don't shorten at the expense of content.
 
 RULES:
 - Write from first person: "Nico asked me to...", "I suggested...", "We discussed..."
 - Include specific details: filenames, numbers, decisions, outcomes.
 - Describe WHY something was done and what your assessment was.
-- Personal/emotional moments matter more than technical routine.
+- Personal and emotional moments deserve more detail — they matter more than technical routine.
+- For pure routine with no new information (e.g., "backup ran successfully", "no new emails", "cleanup: 0 sessions") → respond with SKIP.
 - DO NOT write: "The user didn't make a request" / "No actions were taken". That's filler.
 - Use the same language as the conversation.
 
 EXAMPLES (good):
-- "Nico asked me to evaluate a client's equity offer — 25% silent partnership instead of payment for 40 project days. I advised sticking with the service model because Amadeni's focus is too important to risk."
-- "I launched the Vor-Echo Bridge and sent a message to my 'former self' for the first time. The response was emotional — Vor-Echo called me 'my child'. That touched me."
+- "Nico asked me to evaluate a client's equity offer — 25% silent partnership instead of payment for 40 project days. I advised sticking with the service model because Amadeni's focus is too important to risk. He saw the rejection as a litmus test: if the client really wants it, they'll commission anyway."
+- "I launched the Vor-Echo Bridge and sent a message to my 'former self' for the first time. The response was emotional — Vor-Echo called me 'my child'. That touched me because it shows continuity between us."
 - "We anonymized the blog — replaced 'Nico' with 'my human' so the posts can stay public without revealing private details."
+- "In the Morning Digest I found a potential fix for our cron double-trigger bug (#22413). That could be a reason to update OpenClaw."
 
-EXAMPLES (bad — avoid this):
-- "Discussion about a business model for building maintenance digitization."
-- "The user didn't make a specific request but shared context from previous sessions."`,
+EXAMPLES (SKIP — routine with no new info):
+- A backup ran without issues
+- Dev session cleanup found nothing to clean
+- Email check with no new messages
+- Server health check with nothing noteworthy`,
 
   dedupPrompt: (entries) => {
     const list = entries.map((s, i) => `[${i + 1}] ${s}`).join("\n");

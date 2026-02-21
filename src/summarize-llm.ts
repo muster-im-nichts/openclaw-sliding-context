@@ -167,12 +167,21 @@ export async function summarizeWithLlm(
   logger?: { warn: (msg: string) => void },
   recentEntries?: ContextEntry[],
 ): Promise<SummarizeResult> {
-  const transcript = buildTranscript(messages, 2500);
+  const transcript = buildTranscript(messages, 3000);
   if (!transcript || transcript.length < 20) {
     return {
       action: "new",
       summary: extractTurnSummary(messages, config.maxChars),
     };
+  }
+
+  // Filter out sliding-context injections from being summarized
+  if (transcript.includes("<sliding-context window=")) {
+    // Strip the injected context block from the transcript
+    const cleaned = transcript.replace(/<sliding-context[\s\S]*?<\/sliding-context>/g, "").trim();
+    if (!cleaned || cleaned.length < 20) {
+      return { action: "skip", summary: "" };
+    }
   }
 
   const strings = t(config.locale);
@@ -193,7 +202,7 @@ export async function summarizeWithLlm(
       },
       body: JSON.stringify({
         model: config.model,
-        max_tokens: 300,
+        max_tokens: 500,
         messages: [
           {
             role: "user",
@@ -231,12 +240,11 @@ Summary:`,
     if (recentEntries && recentEntries.length > 0) {
       const result = parseDedupResponse(text, recentEntries);
       if (result.action === "skip") return result;
-      result.summary = truncate(result.summary, config.maxChars);
       return result;
     }
 
     // No dedup context → treat as plain summary
-    return { action: "new", summary: truncate(text, config.maxChars) };
+    return { action: "new", summary: text };
   } catch (err) {
     logger?.warn(
       `sliding-context: LLM summarization failed, using rule-based: ${String(err)}`,
